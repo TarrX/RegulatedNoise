@@ -33,6 +33,7 @@ namespace RegulatedNoise
         public List<Station> StationReferenceList = new List<Station>();
         public Station CurrentStation = null;
         public static GameSettings GameSettings;
+        public static OcrCalibrator OcrCalibrator;
 
         private Ocr ocr;
         private ListViewColumnSorter _stationColumnSorter, _commodityColumnSorter, _allCommodityColumnSorter, _stationToStationColumnSorter, _stationToStationReturnColumnSorter, _commandersLogColumnSorter;
@@ -94,7 +95,14 @@ namespace RegulatedNoise
 
             _logger.Log("  - set application exit handler");
 
-            LoadCalibration();
+            OcrCalibrator = new OcrCalibrator();
+            OcrCalibrator.LoadCalibration();
+            var OcrCalibratorTabPage = new TabPage("OCR Calibration");
+            var oct = new OcrCalibratorTab { Dock = DockStyle.Fill };
+            OcrCalibratorTabPage.Controls.Add(oct);
+            tabControl3.Controls.Add(OcrCalibratorTabPage);
+
+            _logger.Log("  - initialised Ocr Calibrator");
 
             _logger.Log("  - created EDDN object");
 
@@ -498,7 +506,6 @@ namespace RegulatedNoise
             cbDeleteScreenshotOnImport.Checked = RegulatedNoiseSettings.DeleteScreenshotOnImport;
             cbUseEddnTestSchema.Checked = RegulatedNoiseSettings.UseEddnTestSchema;
             cbPostOnImport.Checked = RegulatedNoiseSettings.PostToEddnOnImport;
-            tbUiColour.Text = RegulatedNoiseSettings.UiColour;
 
             if (RegulatedNoiseSettings.UserName != "")
                 tbUsername.Text = RegulatedNoiseSettings.UserName;
@@ -1716,7 +1723,7 @@ namespace RegulatedNoise
 
         private void button7_Click(object sender, EventArgs e)
         {
-            if (lbCalibrationPoints.Items.Count < 10)
+            if (OcrCalibrator.CalibrationBoxes == null || OcrCalibrator.CalibrationBoxes.Count < 10)
             {
                 MessageBox.Show("You need to calibrate first.  Go to the OCR Calibration tab to do so...");
                 return;
@@ -1769,9 +1776,9 @@ namespace RegulatedNoise
                 Point[] returnValue = new Point[12];
 
                 int ctr = 0;
-                foreach (Object o in lbCalibrationPoints.Items)
+                foreach (CalibrationPoint o in Form1.OcrCalibrator.CalibrationBoxes)
                 {
-                    returnValue[ctr] = ((Point)o);
+                    returnValue[ctr] = ((Point)o.Position);
                     ctr++;
                 }
 
@@ -2264,199 +2271,6 @@ namespace RegulatedNoise
         }
         #endregion
 
-        #region Calibration
-        private void button8_Click(object sender, EventArgs e)
-        {
-            setUIColourMode = false;
-
-            lbCalibrationPoints.Items.Clear();
-
-            OpenFileDialog openFile = new OpenFileDialog();
-            openFile.Title = "Open a screenshot for calibration...";
-            openFile.DefaultExt = "bmp";
-            openFile.Multiselect = true;
-            openFile.Filter = "BMP (*.bmp)|*.bmp";
-            openFile.InitialDirectory = Environment.GetFolderPath((Environment.SpecialFolder.MyPictures)) + @"\Frontier Developments\Elite Dangerous";
-
-            if (openFile.ShowDialog() == DialogResult.OK)
-            {
-                Bitmap b = new Bitmap(openFile.FileName);
-                pbCalibrationImage.Image = b;
-
-                ShowInstruction("Point 1: Click just to the top-left of the Station Name.", 1);
-            }
-        }
-
-        private void ShowInstruction(String t, int bitmapNumber)
-        {
-            tbCalibrationInstructions.Text = t;
-            pbCalibrationInstructions.Image = new Bitmap("Calibration Examples\\" + bitmapNumber + ".png");
-        }
-
-        private bool setUIColourMode = false;
-        private void pbCalibrationImage_Click(object sender, EventArgs e)
-        {
-            if (pbCalibrationImage.Image == null)
-                return;
-
-            var eventArgs = (MouseEventArgs)e;
-
-            if (!setUIColourMode)
-            {
-                switch (lbCalibrationPoints.Items.Count + 1)
-                {
-                    case 1:
-                        ShowInstruction(
-                            "Point 2: Click just to the bottom-right of the Station Name.  Don't worry if it's a short station name, we'll compensate for that.",
-                            2);
-                        break;
-                    case 2:
-                        ShowInstruction(
-                            "Point 3: Click just to the bottom-left of the dividing line between the column headers and the commodities",
-                            3);
-                        break;
-                    case 3:
-                        ShowInstruction(
-                            "Point 4: Click just to the left of the line dividing Goods and Sell.  Don't worry about the vertical position, just get the horizontal position right.",
-                            4);
-                        break;
-                    case 4:
-                        ShowInstruction(
-                            "Point 5: Click just to the left of the line dividing Sell and Buy.  Don't worry about the vertical position, just get the horizontal position right.",
-                            5);
-                        break;
-                    case 5:
-                        ShowInstruction(
-                            "Point 6: Click just to the left of the line dividing Buy and Cargo.  Don't worry about the vertical position, just get the horizontal position right.",
-                            6);
-                        break;
-                    case 6:
-                        ShowInstruction(
-                            "Point 7: Click just to the left of the line dividing Cargo and Demand.  Don't worry about the vertical position, just get the horizontal position right.",
-                            7);
-                        break;
-                    case 7:
-                        ShowInstruction(
-                            "Point 8: Click in between the Demand, and the Demand Level (LOW/MED/HIGH).  Don't worry about the vertical position, just get the horizontal position right.",
-                            8);
-                        break;
-                    case 8:
-                        ShowInstruction(
-                            "Point 9: Click just to the left of the line dividing Demand and Supply.  Don't worry about the vertical position, just get the horizontal position right.",
-                            9);
-                        break;
-                    case 9:
-                        ShowInstruction(
-                            "Point 10: Click in between the Supply, and the Supply Level (LOW/MED/HIGH).  Don't worry about the vertical position, just get the horizontal position right.",
-                            10);
-                        break;
-                    case 10:
-                        ShowInstruction(
-                            "Point 11: Click just to the left of the line dividing Supply and Galactic Average.  Don't worry about the vertical position, just get the horizontal position right.",
-                            11);
-                        break;
-                    case 11:
-                        ShowInstruction(
-                            "Point 12: Click at the bottom-left of the commodities list, just above the orange bar that separates it from the Exit button.",
-                            12);
-                        break;
-                    default:
-                        tbCalibrationInstructions.Text =
-                            "Done! You can now go to the OCR tab and begin monitoring for screenshots.";
-                        pbCalibrationImage.Image = null;
-                        break;
-                }
-
-                if (lbCalibrationPoints.Items.Count == 11)
-                {
-                    lbCalibrationPoints.Items.Add(new Point(eventArgs.X, eventArgs.Y));
-                    lbCalibrationPoints.Items[3] = new Point(((Point)lbCalibrationPoints.Items[3]).X,
-                        ((Point)lbCalibrationPoints.Items[2]).Y);
-                    lbCalibrationPoints.Items[4] = new Point(((Point)lbCalibrationPoints.Items[4]).X,
-                        ((Point)lbCalibrationPoints.Items[2]).Y);
-                    lbCalibrationPoints.Items[5] = new Point(((Point)lbCalibrationPoints.Items[5]).X,
-                        ((Point)lbCalibrationPoints.Items[2]).Y);
-                    lbCalibrationPoints.Items[6] = new Point(((Point)lbCalibrationPoints.Items[6]).X,
-                        ((Point)lbCalibrationPoints.Items[2]).Y);
-                    lbCalibrationPoints.Items[7] = new Point(((Point)lbCalibrationPoints.Items[7]).X,
-                        ((Point)lbCalibrationPoints.Items[2]).Y);
-                    lbCalibrationPoints.Items[8] = new Point(((Point)lbCalibrationPoints.Items[8]).X,
-                        ((Point)lbCalibrationPoints.Items[2]).Y);
-                    lbCalibrationPoints.Items[9] = new Point(((Point)lbCalibrationPoints.Items[9]).X,
-                        ((Point)lbCalibrationPoints.Items[2]).Y);
-                    lbCalibrationPoints.Items[10] = new Point(((Point)lbCalibrationPoints.Items[10]).X,
-                        ((Point)lbCalibrationPoints.Items[2]).Y);
-                    lbCalibrationPoints.Items[2] = new Point(((Point)lbCalibrationPoints.Items[0]).X,
-                        ((Point)lbCalibrationPoints.Items[2]).Y);
-                    lbCalibrationPoints.Items[11] = new Point(((Point)lbCalibrationPoints.Items[0]).X,
-                        ((Point)lbCalibrationPoints.Items[11]).Y);
-                    SaveCalibration();
-                }
-                else if (lbCalibrationPoints.Items.Count < 11)
-                {
-                    lbCalibrationPoints.Items.Add(new Point(eventArgs.X, eventArgs.Y));
-                }
-            }
-            else
-            {
-                var pixel = ((Bitmap)pbCalibrationImage.Image).GetPixel(eventArgs.X, eventArgs.Y);
-
-                if (pbUiColour.Image != null)
-                    pbUiColour.Image.Dispose();
-
-                Bitmap b = new Bitmap(317, 87);
-
-                using (var g = Graphics.FromImage(b))
-                {
-                    g.Clear(pixel);
-                }
-                pbUiColour.Image = b;
-                tbUiColour.Text = "#" + pixel.R.ToString("X2") + pixel.G.ToString("X2") + pixel.B.ToString("X2");
-            }
-        }
-
-        private void SaveCalibration()
-        {
-            if (File.Exists("Calibration.txt"))
-                File.Delete("Calibration.txt");
-
-            var writer = new StreamWriter(File.OpenWrite("Calibration.txt"));
-
-            for (int i = 0; i < 12; i++)
-            {
-                writer.Write(((Point)(lbCalibrationPoints.Items[i])).X + ";" + ((Point)(lbCalibrationPoints.Items[i])).Y + ";");
-            }
-
-            writer.Close();
-        }
-
-        private void LoadCalibration()
-        {
-            if (!File.Exists("Calibration.txt")) return;
-
-            var reader = new StreamReader(File.OpenRead("Calibration.txt"));
-
-            var readLine = reader.ReadLine();
-            if (readLine != null)
-            {
-                var coords = readLine.Split(';');
-
-                lbCalibrationPoints.Items.Clear();
-                if (coords.GetLength(0) > 23) // new calibration
-                {
-                    for (int i = 0; i < 12; i++)
-                    {
-                        lbCalibrationPoints.Items.Add(new Point(int.Parse(coords[i * 2]), int.Parse(coords[i * 2 + 1])));
-
-                    }
-                }
-            }
-
-            reader.Close();
-        }
-
-        #endregion
-
         private void bContinueOcr_Click(object sender, EventArgs e)
         {
             if (_commodityTexts == null || _correctionColumn >= _commodityTexts.GetLength(1))
@@ -2601,68 +2415,10 @@ namespace RegulatedNoise
 
                 if (checkboxImportEDDN.Checked)
                 {
-                    string txt = text.ToString();
-                    // .. we're here because we've received some data from EDDN
-
-                    // ReSharper disable StringIndexOfIsCultureSpecific.1
-                    var headerRawStart = txt.IndexOf(@"""header""") + 12;
-                    var headerRawLength = txt.Substring(headerRawStart).IndexOf("}");
-                    var headerRawData = txt.Substring(headerRawStart, headerRawLength);
-
-                    var messageRawStart = txt.IndexOf(@"""message"":") + 12;
-                    var messageRawLength = txt.Substring(messageRawStart).IndexOf("}");
-                    var messageRawData = txt.Substring(messageRawStart, messageRawLength);
-                    // ReSharper restore StringIndexOfIsCultureSpecific.1
-                    var headerRawPairs = headerRawData.Replace(@"""", "").Split(',');
-                    var messageRawPairs = messageRawData.Replace(@"""", "").Split(',');
-
                     var headerDictionary = new Dictionary<string, string>();
                     var messageDictionary = new Dictionary<string, string>();
 
-                    foreach (var rawHeaderPair in headerRawPairs)
-                    {
-                        var splitPair = new string[2];
-                        splitPair[0] = rawHeaderPair.Substring(0, rawHeaderPair.IndexOf(':'));
-                        splitPair[1] = rawHeaderPair.Substring(splitPair[0].Length + 1);
-                        if (splitPair[0].StartsWith(" ")) splitPair[0] = splitPair[0].Substring(1);
-                        if (splitPair[1].StartsWith(" ")) splitPair[1] = splitPair[1].Substring(1);
-                        headerDictionary.Add(splitPair[0], splitPair[1]);
-                    }
-
-                    foreach (var rawMessagePair in messageRawPairs)
-                    {
-                        var splitPair = new string[2];
-                        splitPair[0] = rawMessagePair.Substring(0, rawMessagePair.IndexOf(':'));
-                        splitPair[1] = rawMessagePair.Substring(splitPair[0].Length + 1);
-                        if (splitPair[0].StartsWith(" ")) splitPair[0] = splitPair[0].Substring(1);
-                        if (splitPair[1].StartsWith(" ")) splitPair[1] = splitPair[1].Substring(1);
-                        messageDictionary.Add(splitPair[0], splitPair[1]);
-                    }
-
-                    //System;Station;Commodity;Sell;Buy;Demand;;Supply;;Date;
-                    if (headerDictionary["uploaderID"] != tbUsername.Text) // Don't import our own uploads...
-                    {
-
-                        string csvFormatted = messageDictionary["systemName"] + ";" +
-                                              messageDictionary["stationName"] + ";" +
-                                              messageDictionary["itemName"] + ";" +
-                                              messageDictionary["sellPrice"] + ";" +
-                                              messageDictionary["buyPrice"] + ";" +
-                                              messageDictionary["demand"] + ";" +
-                                              ";" +
-                                              messageDictionary["stationStock"] + ";" +
-                                              ";" +
-                                              messageDictionary["timestamp"] + ";"
-                                              +
-                                              "<From EDDN>" + ";";
-                        ImportCsvString(csvFormatted);
-
-                        if ((DateTime.Now - _lastGuiUpdate) > TimeSpan.FromSeconds(10))
-                        {
-                            SetupGui();
-                            _lastGuiUpdate = DateTime.Now;
-                        }
-                    }
+                    ParseEddnJson(text, headerDictionary, messageDictionary);
                 }
 
                 if (harvestStations && StationDirectory.Count > harvestStationsCount)
@@ -2693,6 +2449,77 @@ namespace RegulatedNoise
                     harvestCommsCount = CommodityDirectory.Count;
                 }
             }
+        }
+
+        private void ParseEddnJson(object text, Dictionary<string, string> headerDictionary, Dictionary<string, string> messageDictionary)
+        {
+            string txt = text.ToString();
+            // .. we're here because we've received some data from EDDN
+
+            if(txt!="")
+                try
+                {
+                    // ReSharper disable StringIndexOfIsCultureSpecific.1
+                    var headerRawStart = txt.IndexOf(@"""header""") + 12;
+                    var headerRawLength = txt.Substring(headerRawStart).IndexOf("}");
+                    var headerRawData = txt.Substring(headerRawStart, headerRawLength);
+
+                    var messageRawStart = txt.IndexOf(@"""message"":") + 12;
+                    var messageRawLength = txt.Substring(messageRawStart).IndexOf("}");
+                    var messageRawData = txt.Substring(messageRawStart, messageRawLength);
+                    // ReSharper restore StringIndexOfIsCultureSpecific.1
+                    var headerRawPairs = headerRawData.Replace(@"""", "").Split(',');
+                    var messageRawPairs = messageRawData.Replace(@"""", "").Split(',');
+
+
+                    foreach (var rawHeaderPair in headerRawPairs)
+                    {
+                        var splitPair = new string[2];
+                        splitPair[0] = rawHeaderPair.Substring(0, rawHeaderPair.IndexOf(':'));
+                        splitPair[1] = rawHeaderPair.Substring(splitPair[0].Length + 1);
+                        if (splitPair[0].StartsWith(" ")) splitPair[0] = splitPair[0].Substring(1);
+                        if (splitPair[1].StartsWith(" ")) splitPair[1] = splitPair[1].Substring(1);
+                        headerDictionary.Add(splitPair[0], splitPair[1]);
+                    }
+
+                    foreach (var rawMessagePair in messageRawPairs)
+                    {
+                        var splitPair = new string[2];
+                        splitPair[0] = rawMessagePair.Substring(0, rawMessagePair.IndexOf(':'));
+                        splitPair[1] = rawMessagePair.Substring(splitPair[0].Length + 1);
+                        if (splitPair[0].StartsWith(" ")) splitPair[0] = splitPair[0].Substring(1);
+                        if (splitPair[1].StartsWith(" ")) splitPair[1] = splitPair[1].Substring(1);
+                        messageDictionary.Add(splitPair[0], splitPair[1]);
+                    }
+
+                    //System;Station;Commodity;Sell;Buy;Demand;;Supply;;Date;
+                    if (headerDictionary["uploaderID"] != tbUsername.Text) // Don't import our own uploads...
+                    {
+                        string csvFormatted = messageDictionary["systemName"] + ";" +
+                                              messageDictionary["stationName"] + ";" +
+                                              messageDictionary["itemName"] + ";" +
+                                              messageDictionary["sellPrice"] + ";" +
+                                              messageDictionary["buyPrice"] + ";" +
+                                              messageDictionary["demand"] + ";" +
+                                              ";" +
+                                              messageDictionary["stationStock"] + ";" +
+                                              ";" +
+                                              messageDictionary["timestamp"] + ";"
+                                              +
+                                              "<From EDDN>" + ";";
+                        ImportCsvString(csvFormatted);
+
+                        if ((DateTime.Now - _lastGuiUpdate) > TimeSpan.FromSeconds(10))
+                        {
+                            SetupGui();
+                            _lastGuiUpdate = DateTime.Now;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    tbEDDNOutput.Text = "Couldn't parse JSON!\r\n\r\n" + tbEDDNOutput.Text;
+                }
         }
 
         private delegate void SetListeningDelegate();
@@ -3486,7 +3313,7 @@ namespace RegulatedNoise
 
         private void bCommodityDeleteRow_Click(object sender, EventArgs e)
         {
-            foreach (ListViewItem item in lbCommodities.SelectedItems)
+           foreach (ListViewItem item in lbCommodities.SelectedItems)
             {
                 var csvrow =
                     StationDirectory[item.Text].First(
@@ -3589,49 +3416,6 @@ namespace RegulatedNoise
             //}
         }
 
-        private void button13_Click(object sender, EventArgs e)
-        {
-            OpenFileDialog openFile = new OpenFileDialog();
-            openFile.Title = "Open a screenshot for calibration...";
-            openFile.DefaultExt = "bmp";
-            openFile.Multiselect = true;
-            openFile.Filter = "BMP (*.bmp)|*.bmp";
-            openFile.InitialDirectory = Environment.GetFolderPath((Environment.SpecialFolder.MyPictures)) + @"\Frontier Developments\Elite Dangerous";
-
-            if (openFile.ShowDialog() == DialogResult.OK)
-            {
-                Bitmap b = new Bitmap(openFile.FileName);
-                pbCalibrationImage.Image = b;
-
-                MessageBox.Show("Click a pixel in a Commodity Name to grab its colour.  When you're happy, click the \"This is the correct colour\" button.");
-                setUIColourMode = true;
-            }
-        }
-
-        private void button14_Click(object sender, EventArgs e)
-        {
-            RegulatedNoiseSettings.UiColour = tbUiColour.Text;
-        }
-
-        private void tbUiColour_TextChanged(object sender, EventArgs e)
-        {
-            if (pbUiColour.Image != null)
-                pbUiColour.Image.Dispose();
-
-            Bitmap b = new Bitmap(317, 87);
-
-            int red = int.Parse(tbUiColour.Text.Substring(1, 2), System.Globalization.NumberStyles.HexNumber);
-            int green = int.Parse(tbUiColour.Text.Substring(3, 2), System.Globalization.NumberStyles.HexNumber);
-            int blue = int.Parse(tbUiColour.Text.Substring(5, 2), System.Globalization.NumberStyles.HexNumber);
-
-            using (var g = Graphics.FromImage(b))
-            {
-                g.Clear(Color.FromArgb(red, green, blue));
-            }
-            pbUiColour.Image = b;
-        }
-
-
         private void cbLightYears_TextChanged(object sender, EventArgs e)
         {
             if (checkboxLightYears.Checked)
@@ -3725,25 +3509,6 @@ namespace RegulatedNoise
 
             // Perform the sort with these new sort options.
             lvStationToStationReturn.Sort();
-        }
-
-        private void btn_autocal_Click(object sender, EventArgs e)
-        {
-            if (GameSettings.Display == null)
-            {
-                MessageBox.Show("Unable to calibrate automatically. Please use the manual calibration tool.");
-                return;
-            }
-            tb_resx.Text = GameSettings.Display.Resolution.X.ToString();
-            tb_resy.Text = GameSettings.Display.Resolution.Y.ToString();
-            
-            lbCalibrationPoints.Items.Clear();
-            var points = new OcrCalibrator().getCalculatedCalibrationPoints(GameSettings.Display.Resolution);
-            foreach (var point in points)
-            {
-                lbCalibrationPoints.Items.Add(point);
-            }
-            SaveCalibration();
         }
     }
 }
